@@ -14,8 +14,8 @@ WORKDIR /app
 # Skopiuj pliki package
 COPY package*.json ./
 
-# Zainstaluj zależności (tylko produkcyjne)
-RUN npm ci --only=production && \
+# Zainstaluj wszystkie zależności (potrzebne do buildu)
+RUN npm ci && \
     npm cache clean --force
 
 # Skopiuj kod źródłowy
@@ -23,6 +23,10 @@ COPY . .
 
 # Zbuduj projekt TypeScript
 RUN npm run build
+
+# Zainstaluj tylko produkcyjne zależności (dla runtime)
+RUN npm ci --omit=dev && \
+    npm cache clean --force
 
 # Etap 2: Runtime
 FROM node:18-alpine
