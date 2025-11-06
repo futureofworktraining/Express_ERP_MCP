@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+npm-debug.log
+
+# Git
+.git/
+.gitignore
+
+# Build artifacts
+dist/
+build/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Documentation
+*.md
+!README.md
+
+# Tests
+tests/
+coverage/
+.nyc_output/
+
+# Misc
+.DS_Store
+Thumbs.db
+*.log
