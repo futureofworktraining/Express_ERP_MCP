@@ -8,14 +8,22 @@ import type { AppConfig } from '../types/index.js';
  * Pobiera konfigurację ze zmiennych środowiskowych
  */
 export function getConfig(): AppConfig {
+  // Debug: wypisz dostępne zmienne środowiskowe (tylko klucze, nie wartości)
+  const envKeys = Object.keys(process.env).filter(key =>
+    key.startsWith('SUPABASE') || key.startsWith('NODE') || key.startsWith('API')
+  );
+  console.error('[DEBUG] Dostępne zmienne środowiskowe:', envKeys.join(', '));
+
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseBearerToken = process.env.SUPABASE_BEARER_TOKEN;
 
   if (!supabaseUrl) {
+    console.error('[DEBUG] Wszystkie zmienne env:', Object.keys(process.env).join(', '));
     throw new Error('SUPABASE_URL environment variable is required');
   }
 
   if (!supabaseBearerToken) {
+    console.error('[DEBUG] SUPABASE_URL znaleziony, ale brak SUPABASE_BEARER_TOKEN');
     throw new Error('SUPABASE_BEARER_TOKEN environment variable is required');
   }
 
