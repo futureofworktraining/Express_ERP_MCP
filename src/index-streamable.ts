@@ -110,48 +110,66 @@ async function main(): Promise<void> {
       })
     );
 
-    // API Key Authentication Middleware (tylko dla /mcp endpoint)
+    // MCP Authorization Middleware - zgodne z MCP Specification 2025-03-26
+    // https://modelcontextprotocol.io/specification/2025-03-26/basic/authorization
     const MCP_API_KEY = process.env.MCP_API_KEY;
     const authMiddleware = (req: express.Request, res: express.Response, next: express.NextFunction) => {
-      // Pomiń autentykację dla health check i info endpoints
+      // Pomiń autentykację dla publicznych endpoints
       if (req.path === '/health' || req.path === '/' || req.path === '/test/verify-order') {
         return next();
       }
 
-      // Sprawdź API key w headerach
-      const apiKey = req.headers['x-api-key'] || req.headers['authorization']?.replace('Bearer ', '');
-
       if (!MCP_API_KEY) {
         // Jeśli MCP_API_KEY nie jest ustawiony, pomiń autentykację (development mode)
-        log('info', 'MCP_API_KEY nie ustawiony - autentykacja wyłączona');
+        log('info', 'MCP_API_KEY nie ustawiony - autentykacja wyłączona (dev mode)');
         return next();
       }
 
-      if (!apiKey) {
-        log('error', 'Brak API key w żądaniu');
+      // Sprawdź Authorization header (zgodnie z MCP spec)
+      // Format: "Authorization: Bearer <token>"
+      const authHeader = req.headers['authorization'];
+
+      if (!authHeader) {
+        log('error', 'Brak Authorization header');
         return res.status(401).json({
           jsonrpc: '2.0',
           error: {
             code: -32000,
-            message: 'Unauthorized: API key required. Provide X-API-Key or Authorization header.',
+            message: 'Unauthorized: Authorization header required. Use "Authorization: Bearer <token>"',
           },
           id: null,
         });
       }
 
-      if (apiKey !== MCP_API_KEY) {
-        log('error', 'Nieprawidłowy API key');
+      // Wyciągnij token z Bearer
+      const token = authHeader.replace(/^Bearer\s+/i, '');
+
+      if (!token || token === authHeader) {
+        log('error', 'Nieprawidłowy format Authorization header');
+        return res.status(400).json({
+          jsonrpc: '2.0',
+          error: {
+            code: -32000,
+            message: 'Bad Request: Authorization header must use Bearer scheme',
+          },
+          id: null,
+        });
+      }
+
+      if (token !== MCP_API_KEY) {
+        log('error', 'Nieprawidłowy access token');
         return res.status(403).json({
           jsonrpc: '2.0',
           error: {
             code: -32000,
-            message: 'Forbidden: Invalid API key',
+            message: 'Forbidden: Invalid access token',
           },
           id: null,
         });
       }
 
-      // API key poprawny
+      // Token poprawny
+      log('info', 'Autentykacja zakończona sukcesem');
       next();
     };
 
