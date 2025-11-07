@@ -6,9 +6,11 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/index-http.js",
+    "start": "node dist/index-streamable.js",
+    "start:http": "node dist/index-http.js",
     "start:stdio": "node dist/index.js",
-    "dev": "tsx watch src/index-http.ts",
+    "dev": "tsx watch src/index-streamable.ts",
+    "dev:http": "tsx watch src/index-http.ts",
     "dev:stdio": "tsx watch src/index.ts",
     "test": "jest",
     "test:watch": "jest --watch",
