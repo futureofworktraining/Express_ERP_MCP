@@ -80,7 +80,6 @@ export async function handleVerifyOrder(
 Możliwe przyczyny:
 • Numer zamówienia został wpisany nieprawidłowo
 • Zamówienie nie istnieje w systemie
-• Zamówienie zostało usunięte
 
 Proszę sprawdzić poprawność numeru zamówienia i spróbować ponownie.`;
     }
