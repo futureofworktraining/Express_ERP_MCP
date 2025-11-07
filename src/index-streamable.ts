@@ -110,6 +110,53 @@ async function main(): Promise<void> {
       })
     );
 
+    // API Key Authentication Middleware (tylko dla /mcp endpoint)
+    const MCP_API_KEY = process.env.MCP_API_KEY;
+    const authMiddleware = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      // Pomiń autentykację dla health check i info endpoints
+      if (req.path === '/health' || req.path === '/' || req.path === '/test/verify-order') {
+        return next();
+      }
+
+      // Sprawdź API key w headerach
+      const apiKey = req.headers['x-api-key'] || req.headers['authorization']?.replace('Bearer ', '');
+
+      if (!MCP_API_KEY) {
+        // Jeśli MCP_API_KEY nie jest ustawiony, pomiń autentykację (development mode)
+        log('info', 'MCP_API_KEY nie ustawiony - autentykacja wyłączona');
+        return next();
+      }
+
+      if (!apiKey) {
+        log('error', 'Brak API key w żądaniu');
+        return res.status(401).json({
+          jsonrpc: '2.0',
+          error: {
+            code: -32000,
+            message: 'Unauthorized: API key required. Provide X-API-Key or Authorization header.',
+          },
+          id: null,
+        });
+      }
+
+      if (apiKey !== MCP_API_KEY) {
+        log('error', 'Nieprawidłowy API key');
+        return res.status(403).json({
+          jsonrpc: '2.0',
+          error: {
+            code: -32000,
+            message: 'Forbidden: Invalid API key',
+          },
+          id: null,
+        });
+      }
+
+      // API key poprawny
+      next();
+    };
+
+    app.use(authMiddleware);
+
     // Mapa przechowująca transporty per sesja
     const transports: Map<string, StreamableHTTPServerTransport> = new Map();
 
