@@ -11,27 +11,50 @@ import { ApiError } from '../types/index.js';
 export const getDatabaseSchemaTool = {
   name: 'get_database_schema',
   description:
-    'Pobiera szczegółową strukturę bazy danych Supabase. ' +
-    'Zwraca informacje o tabelach, kolumnach (nazwy, typy danych, nullable, default values), ' +
-    'relacjach (foreign keys) oraz indeksach. ' +
-    'Użyj tego narzędzia aby zrozumieć strukturę bazy przed wykonaniem zapytań SQL.',
+    'Retrieves detailed database schema information from Supabase PostgreSQL. ' +
+    'Returns comprehensive metadata about tables, columns, relationships, and indexes. ' +
+    '\n\n' +
+    '📋 USE CASES:\n' +
+    '• Discover database structure before writing SQL queries\n' +
+    '• Understand table relationships and foreign keys\n' +
+    '• Check column data types and constraints\n' +
+    '• Identify primary keys and indexes for query optimization\n' +
+    '• Generate documentation or ERD diagrams\n' +
+    '\n' +
+    '💡 USAGE TIPS:\n' +
+    '• ALWAYS call this tool first before executing SQL queries\n' +
+    '• Use it to verify table and column names (case-sensitive!)\n' +
+    '• Check foreign key relationships for JOIN queries\n' +
+    '• Review indexes to understand query performance\n' +
+    '\n' +
+    '📊 RETURNED DATA:\n' +
+    '• Tables: names and schema\n' +
+    '• Columns: name, data type, nullable, defaults, max length\n' +
+    '• Foreign Keys: source/target tables and columns\n' +
+    '• Indexes: names, uniqueness, primary key status\n' +
+    '\n' +
+    '⚠️ IMPORTANT:\n' +
+    '• Table names are case-sensitive in PostgreSQL\n' +
+    '• Use double quotes for mixed-case names: "TableName"\n' +
+    '• Only shows tables visible with current RLS permissions\n' +
+    '• Default schema is "public" (most common)',
   inputSchema: {
     type: 'object',
     properties: {
       include_relations: {
         type: 'boolean',
         description:
-          'Czy dołączyć informacje o relacjach między tabelami (foreign keys). Domyślnie: true',
+          'Include foreign key relationships between tables. Recommended: true. Default: true',
         default: true,
       },
       include_indexes: {
         type: 'boolean',
-        description: 'Czy dołączyć informacje o indeksach. Domyślnie: true',
+        description: 'Include index information for performance analysis. Default: true',
         default: true,
       },
       schema: {
         type: 'string',
-        description: 'Nazwa schematu do sprawdzenia. Domyślnie: "public"',
+        description: 'Database schema name to query. Use "public" for main tables. Default: "public"',
         default: 'public',
         minLength: 1,
         maxLength: 63,
@@ -47,29 +70,59 @@ export const getDatabaseSchemaTool = {
 export const executeSQLLimitedTool = {
   name: 'execute_sql_limited',
   description:
-    'Wykonuje zapytanie SQL SELECT do bazy danych Supabase z domyślnym ograniczeniem liczby rekordów. ' +
-    'WAŻNE: Dozwolone są TYLKO zapytania SELECT. Zapytania modyfikujące dane (INSERT, UPDATE, DELETE) są zabronione. ' +
-    'Domyślny limit to 50 rekordów (konfigurowalny w ustawieniach serwera). ' +
-    'Użyj tego narzędzia do pobierania danych z tabel ERP.',
+    'Executes SELECT queries against Supabase PostgreSQL database with automatic record limiting. ' +
+    'Provides safe, read-only access to ERP data with built-in security constraints. ' +
+    '\n\n' +
+    '📋 USE CASES:\n' +
+    '• Query customer, order, product, and complaint data\n' +
+    '• Generate reports and analytics\n' +
+    '• Search and filter records\n' +
+    '• Join related tables for comprehensive data views\n' +
+    '• Perform aggregations (COUNT, SUM, AVG, etc.)\n' +
+    '\n' +
+    '💡 USAGE TIPS:\n' +
+    '• Call get_database_schema FIRST to see available tables\n' +
+    '• Table names with capitals MUST use double quotes: "Zamowienia" not zamowienia\n' +
+    '• Default limit is 50 records (override with limit parameter)\n' +
+    '• Use offset for pagination through large result sets\n' +
+    '• Respects Row Level Security (RLS) - only authorized data returned\n' +
+    '\n' +
+    '📝 QUERY EXAMPLES:\n' +
+    '• Simple: SELECT * FROM "Klienci" WHERE email LIKE \'%@example.com\'\n' +
+    '• JOIN: SELECT k.imie, z.numer_zamowienia FROM "Klienci" k JOIN "Zamowienia" z ON k.id = z.id_klienta\n' +
+    '• Aggregate: SELECT COUNT(*), AVG(wartosc_calkowita) FROM "Zamowienia" WHERE status = \'completed\'\n' +
+    '• With limit: Add LIMIT 100 to your query (max 1000)\n' +
+    '\n' +
+    '🔒 SECURITY:\n' +
+    '• ONLY SELECT queries allowed - no data modification\n' +
+    '• Automatically blocks: INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE\n' +
+    '• RLS policies enforced - user sees only permitted data\n' +
+    '• Default 50 record limit prevents accidental large queries\n' +
+    '\n' +
+    '⚠️ CRITICAL: TABLE NAME SYNTAX\n' +
+    '• Tables created with capitals REQUIRE double quotes\n' +
+    '• WRONG: SELECT * FROM Zamowienia (will fail!)\n' +
+    '• CORRECT: SELECT * FROM "Zamowienia"\n' +
+    '• Check get_database_schema output for exact table names',
   inputSchema: {
     type: 'object',
     properties: {
       query: {
         type: 'string',
         description:
-          'Zapytanie SQL SELECT do wykonania. Przykład: "SELECT * FROM zamowienia WHERE status = \'active\'"',
+          'SQL SELECT query to execute. IMPORTANT: Use double quotes for mixed-case table names like "Zamowienia". Example: SELECT * FROM "Klienci" WHERE email = \'test@example.com\'',
         minLength: 10,
       },
       limit: {
         type: 'number',
         description:
-          'Opcjonalny limit rekordów do pobrania. Jeśli nie podano, używany jest domyślny limit z konfiguracji (50). Maksymalny limit to 1000.',
+          'Maximum number of records to return. Default: 50 (from config). Max: 1000. Use for pagination or limiting large result sets.',
         minimum: 1,
         maximum: 1000,
       },
       offset: {
         type: 'number',
-        description: 'Opcjonalny offset dla paginacji wyników. Domyślnie: 0',
+        description: 'Number of records to skip (for pagination). Example: offset=50 with limit=50 returns records 51-100. Default: 0',
         minimum: 0,
         default: 0,
       },

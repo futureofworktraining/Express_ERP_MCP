@@ -11,15 +11,36 @@ import { ApiError } from '../types/index.js';
 export const verifyOrderTool = {
   name: 'verify_order',
   description:
-    'Weryfikuje istnienie zamówienia w systemie ERP i pobiera szczegóły zamówienia. ' +
-    'Zwraca informacje o statusie zamówienia, wartości oraz danych klienta.',
+    'Verifies if an order exists in the ERP system and retrieves detailed order information. ' +
+    'Returns order status, total value, customer details, and order metadata. ' +
+    '\n\n' +
+    '📋 USE CASES:\n' +
+    '• Check if an order number exists before processing\n' +
+    '• Retrieve customer information for a specific order\n' +
+    '• Verify order status and total value\n' +
+    '• Validate order references in complaints or inquiries\n' +
+    '\n' +
+    '💡 USAGE TIPS:\n' +
+    '• Order numbers typically follow format: OP1001, OP1002, etc.\n' +
+    '• The tool respects Row Level Security (RLS) - only authorized orders are returned\n' +
+    '• Returns null if order doesn\'t exist or user lacks permission\n' +
+    '\n' +
+    '📊 RETURNED DATA:\n' +
+    '• Order ID and number\n' +
+    '• Order status (pending, in_progress, completed, etc.)\n' +
+    '• Total order value\n' +
+    '• Customer name and email\n' +
+    '\n' +
+    '⚠️ IMPORTANT:\n' +
+    '• Order numbers are case-sensitive\n' +
+    '• Authentication token determines data visibility (RLS applies)',
   inputSchema: {
     type: 'object',
     properties: {
       numer_zamowienia: {
         type: 'string',
         description:
-          'Numer zamówienia do weryfikacji (np. OP1001, OP1002). Wymagany parametr.',
+          'Order number to verify (e.g., OP1001, OP1002). Required parameter. Must be exact match.',
         minLength: 1,
         maxLength: 50,
       },

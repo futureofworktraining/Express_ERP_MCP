@@ -64,16 +64,18 @@ function createMcpServer(
   server.registerTool(
     'verify_order',
     {
-      title: 'Weryfikacja Zamówienia',
+      title: 'Verify Order',
       description:
-        'Weryfikuje istnienie zamówienia w systemie ERP i pobiera szczegóły zamówienia. ' +
-        'Zwraca informacje o statusie zamówienia, wartości oraz danych klienta.',
+        'Verifies if an order exists in the ERP system and retrieves detailed order information. ' +
+        'Returns order status, total value, customer details. Use this to validate order numbers ' +
+        'and retrieve customer information. Order numbers follow format: OP1001, OP1002, etc. ' +
+        'Respects Row Level Security (RLS) - only authorized orders are returned.',
       inputSchema: {
         numer_zamowienia: z
           .string()
           .min(1)
           .max(50)
-          .describe('Numer zamówienia do weryfikacji (np. OP1001, OP1002). Wymagany parametr.'),
+          .describe('Order number to verify (e.g., OP1001, OP1002). Required parameter. Case-sensitive.'),
       },
     },
     async (args, _extra) => {
@@ -96,26 +98,27 @@ function createMcpServer(
   server.registerTool(
     'get_database_schema',
     {
-      title: 'Pobierz Strukturę Bazy Danych',
+      title: 'Get Database Schema',
       description:
-        'Pobiera szczegółową strukturę bazy danych Supabase. ' +
-        'Zwraca informacje o tabelach, kolumnach, relacjach (foreign keys) oraz indeksach.',
+        'Retrieves detailed database schema from Supabase PostgreSQL. Returns tables, columns (name, type, nullable, defaults), ' +
+        'foreign key relationships, and indexes. ALWAYS call this FIRST before executing SQL queries to see available tables ' +
+        'and their exact names. CRITICAL: Table names with capitals require double quotes in SQL queries (e.g., "Zamowienia").',
       inputSchema: {
         include_relations: z
           .boolean()
           .optional()
           .default(true)
-          .describe('Czy dołączyć informacje o relacjach między tabelami (foreign keys)'),
+          .describe('Include foreign key relationships between tables. Recommended: true. Default: true'),
         include_indexes: z
           .boolean()
           .optional()
           .default(true)
-          .describe('Czy dołączyć informacje o indeksach'),
+          .describe('Include index information for performance analysis. Default: true'),
         schema: z
           .string()
           .optional()
           .default('public')
-          .describe('Nazwa schematu do sprawdzenia (domyślnie: "public")'),
+          .describe('Database schema name to query. Use "public" for main tables. Default: "public"'),
       },
     },
     async (args, _extra) => {
@@ -136,27 +139,30 @@ function createMcpServer(
   server.registerTool(
     'execute_sql_limited',
     {
-      title: 'Wykonaj Zapytanie SQL z Limitem',
+      title: 'Execute SQL Query (SELECT only)',
       description:
-        'Wykonuje zapytanie SQL SELECT do bazy danych z domyślnym ograniczeniem liczby rekordów. ' +
-        'Dozwolone są TYLKO zapytania SELECT. Domyślny limit to 50 rekordów.',
+        'Executes SELECT queries against Supabase PostgreSQL with automatic record limiting. ' +
+        'ONLY SELECT queries allowed - no data modification. Default limit: 50 records (max 1000). ' +
+        'CRITICAL: Table names with capitals MUST use double quotes: "Zamowienia" not Zamowienia. ' +
+        'Examples: SELECT * FROM "Klienci"; SELECT k.imie, z.numer_zamowienia FROM "Klienci" k JOIN "Zamowienia" z ON k.id = z.id_klienta. ' +
+        'Respects Row Level Security (RLS) - only authorized data returned.',
       inputSchema: {
         query: z
           .string()
           .min(10)
-          .describe('Zapytanie SQL SELECT do wykonania. Tylko zapytania SELECT są dozwolone.'),
+          .describe('SQL SELECT query. IMPORTANT: Use double quotes for mixed-case table names like "Zamowienia". Example: SELECT * FROM "Klienci" WHERE email = \'test@example.com\''),
         limit: z
           .number()
           .min(1)
           .max(1000)
           .optional()
-          .describe('Opcjonalny limit rekordów (domyślnie 50, max 1000)'),
+          .describe('Maximum records to return. Default: 50 (from config). Max: 1000. Use for pagination.'),
         offset: z
           .number()
           .min(0)
           .optional()
           .default(0)
-          .describe('Opcjonalny offset dla paginacji'),
+          .describe('Records to skip (for pagination). Example: offset=50 with limit=50 returns records 51-100. Default: 0'),
       },
     },
     async (args, _extra) => {
