@@ -23,7 +23,13 @@ import { handleVerifyOrder } from './tools/orderVerification.js';
  */
 function log(level: string, message: string, ...args: unknown[]): void {
   const timestamp = new Date().toISOString();
-  console.error(`[${timestamp}] [${level.toUpperCase()}] ${message}`, ...args);
+  const logMessage = `[${timestamp}] [${level.toUpperCase()}] ${message}`;
+
+  if (level === 'error') {
+    console.error(logMessage, ...args);
+  } else {
+    console.log(logMessage, ...args);
+  }
 }
 
 /**
