@@ -14,22 +14,23 @@ export function getConfig(): AppConfig {
   );
   console.error('[DEBUG] Dostępne zmienne środowiskowe:', envKeys.join(', '));
 
-  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseProjectUrl = process.env.SUPABASE_PROJECT_URL;
   const supabaseBearerToken = process.env.SUPABASE_BEARER_TOKEN;
 
-  if (!supabaseUrl) {
+  if (!supabaseProjectUrl) {
     console.error('[DEBUG] Wszystkie zmienne env:', Object.keys(process.env).join(', '));
-    throw new Error('SUPABASE_URL environment variable is required');
+    throw new Error('SUPABASE_PROJECT_URL environment variable is required');
   }
 
   if (!supabaseBearerToken) {
-    console.error('[DEBUG] SUPABASE_URL znaleziony, ale brak SUPABASE_BEARER_TOKEN');
+    console.error('[DEBUG] SUPABASE_PROJECT_URL znaleziony, ale brak SUPABASE_BEARER_TOKEN');
     throw new Error('SUPABASE_BEARER_TOKEN environment variable is required');
   }
 
   return {
-    supabaseUrl,
+    supabaseProjectUrl,
     supabaseBearerToken,
+    defaultQueryLimit: parseInt(process.env.DEFAULT_QUERY_LIMIT || '50', 10),
     apiTimeout: parseInt(process.env.API_TIMEOUT || '5000', 10),
     logLevel: process.env.LOG_LEVEL || 'info',
     nodeEnv: process.env.NODE_ENV || 'development',
@@ -40,8 +41,8 @@ export function getConfig(): AppConfig {
  * Waliduje konfigurację
  */
 export function validateConfig(config: AppConfig): void {
-  if (!config.supabaseUrl.startsWith('http')) {
-    throw new Error('SUPABASE_URL must be a valid HTTP URL');
+  if (!config.supabaseProjectUrl.startsWith('http')) {
+    throw new Error('SUPABASE_PROJECT_URL must be a valid HTTP URL');
   }
 
   if (config.supabaseBearerToken.length < 10) {

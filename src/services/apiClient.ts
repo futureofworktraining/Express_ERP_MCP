@@ -13,7 +13,12 @@ import { ApiError } from '../types/index.js';
  * Klasa klienta API
  */
 export class ApiClient {
-  constructor(private config: AppConfig) {}
+  private readonly orderVerificationUrl: string;
+
+  constructor(private config: AppConfig) {
+    // Buduj pełny URL do Edge Function weryfikacji zamówień
+    this.orderVerificationUrl = `${config.supabaseProjectUrl}/functions/v1/order-verification`;
+  }
 
   /**
    * Weryfikuje zamówienie w systemie ERP
@@ -57,7 +62,7 @@ export class ApiClient {
     const timeoutId = setTimeout(() => controller.abort(), this.config.apiTimeout);
 
     try {
-      const response = await fetch(this.config.supabaseUrl, {
+      const response = await fetch(this.orderVerificationUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

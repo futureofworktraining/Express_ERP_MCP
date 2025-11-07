@@ -16,7 +16,14 @@ import {
 
 import { getConfig, validateConfig } from './config/index.js';
 import { ApiClient } from './services/apiClient.js';
+import { DatabaseClient } from './services/databaseClient.js';
 import { verifyOrderTool, handleVerifyOrder } from './tools/orderVerification.js';
+import {
+  getDatabaseSchemaTool,
+  executeSQLLimitedTool,
+  handleGetDatabaseSchema,
+  handleExecuteSQLLimited,
+} from './tools/databaseTools.js';
 
 /**
  * Logowanie
@@ -41,6 +48,15 @@ async function main(): Promise<void> {
     // Utwórz klienta API
     const apiClient = new ApiClient(config);
     log('info', 'Klient API zainicjalizowany');
+
+    // Utwórz klienta bazy danych
+    const databaseClient = new DatabaseClient(config);
+    if (config.supabaseProjectUrl && config.supabaseBearerToken) {
+      log('info', 'Klient bazy danych zainicjalizowany [Bearer Token - z RLS]');
+      log('info', '✓ Wszystkie zapytania respektują Row Level Security - bezpieczne dla agentów AI');
+    } else {
+      log('warn', 'Klient bazy danych nie został skonfigurowany. Narzędzia database będą niedostępne.');
+    }
 
     // Utwórz Express app
     const app = express();
@@ -71,7 +87,7 @@ async function main(): Promise<void> {
           sse: '/sse',
           test: '/test',
         },
-        tools: ['verify_order'],
+        tools: ['verify_order', 'get_database_schema', 'execute_sql_limited'],
       });
     });
 
@@ -117,7 +133,7 @@ async function main(): Promise<void> {
       mcpServer.setRequestHandler(ListToolsRequestSchema, async () => {
         log('info', 'Otrzymano żądanie list_tools');
         return {
-          tools: [verifyOrderTool],
+          tools: [verifyOrderTool, getDatabaseSchemaTool, executeSQLLimitedTool],
         };
       });
 
@@ -128,6 +144,14 @@ async function main(): Promise<void> {
 
         if (name === 'verify_order') {
           return await handleVerifyOrder(apiClient, args);
+        }
+
+        if (name === 'get_database_schema') {
+          return await handleGetDatabaseSchema(databaseClient, args);
+        }
+
+        if (name === 'execute_sql_limited') {
+          return await handleExecuteSQLLimited(databaseClient, args);
         }
 
         throw new Error(`Nieznane narzędzie: ${name}`);
@@ -174,8 +198,8 @@ async function main(): Promise<void> {
       console.error(`\nBŁĄD: ${error.message}\n`);
 
       // Pomocne wskazówki
-      if (error.message.includes('SUPABASE_URL')) {
-        console.error('Ustaw zmienną środowiskową SUPABASE_URL');
+      if (error.message.includes('SUPABASE_PROJECT_URL')) {
+        console.error('Ustaw zmienną środowiskową SUPABASE_PROJECT_URL');
       } else if (error.message.includes('SUPABASE_BEARER_TOKEN')) {
         console.error('Ustaw zmienną środowiskową SUPABASE_BEARER_TOKEN');
       }

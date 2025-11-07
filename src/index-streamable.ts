@@ -16,7 +16,12 @@ import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 
 import { getConfig, validateConfig } from './config/index.js';
 import { ApiClient } from './services/apiClient.js';
+import { DatabaseClient } from './services/databaseClient.js';
 import { handleVerifyOrder } from './tools/orderVerification.js';
+import {
+  handleGetDatabaseSchema,
+  handleExecuteSQLLimited,
+} from './tools/databaseTools.js';
 
 /**
  * Logowanie
@@ -35,9 +40,14 @@ function log(level: string, message: string, ...args: unknown[]): void {
 /**
  * Tworzy instancję MCP servera z naszymi narzędziami
  * @param apiClient - Klient API
+ * @param databaseClient - Klient bazy danych
  * @param bearerToken - Token autoryzacyjny (opcjonalny, przekazywany do Supabase)
  */
-function createMcpServer(apiClient: ApiClient, bearerToken?: string): McpServer {
+function createMcpServer(
+  apiClient: ApiClient,
+  databaseClient: DatabaseClient,
+  bearerToken?: string
+): McpServer {
   const server = new McpServer(
     {
       name: 'express-erp-mcp',
@@ -82,6 +92,87 @@ function createMcpServer(apiClient: ApiClient, bearerToken?: string): McpServer 
     }
   );
 
+  // Rejestracja narzędzia get_database_schema
+  server.registerTool(
+    'get_database_schema',
+    {
+      title: 'Pobierz Strukturę Bazy Danych',
+      description:
+        'Pobiera szczegółową strukturę bazy danych Supabase. ' +
+        'Zwraca informacje o tabelach, kolumnach, relacjach (foreign keys) oraz indeksach.',
+      inputSchema: {
+        include_relations: z
+          .boolean()
+          .optional()
+          .default(true)
+          .describe('Czy dołączyć informacje o relacjach między tabelami (foreign keys)'),
+        include_indexes: z
+          .boolean()
+          .optional()
+          .default(true)
+          .describe('Czy dołączyć informacje o indeksach'),
+        schema: z
+          .string()
+          .optional()
+          .default('public')
+          .describe('Nazwa schematu do sprawdzenia (domyślnie: "public")'),
+      },
+    },
+    async (args, _extra) => {
+      log('info', `Wywołanie get_database_schema z argumentami:`, args);
+
+      const result = await handleGetDatabaseSchema(databaseClient, args);
+
+      return {
+        content: result.content.map((item) => ({
+          type: item.type as 'text',
+          text: item.text,
+        })),
+      };
+    }
+  );
+
+  // Rejestracja narzędzia execute_sql_limited
+  server.registerTool(
+    'execute_sql_limited',
+    {
+      title: 'Wykonaj Zapytanie SQL z Limitem',
+      description:
+        'Wykonuje zapytanie SQL SELECT do bazy danych z domyślnym ograniczeniem liczby rekordów. ' +
+        'Dozwolone są TYLKO zapytania SELECT. Domyślny limit to 50 rekordów.',
+      inputSchema: {
+        query: z
+          .string()
+          .min(10)
+          .describe('Zapytanie SQL SELECT do wykonania. Tylko zapytania SELECT są dozwolone.'),
+        limit: z
+          .number()
+          .min(1)
+          .max(1000)
+          .optional()
+          .describe('Opcjonalny limit rekordów (domyślnie 50, max 1000)'),
+        offset: z
+          .number()
+          .min(0)
+          .optional()
+          .default(0)
+          .describe('Opcjonalny offset dla paginacji'),
+      },
+    },
+    async (args, _extra) => {
+      log('info', `Wywołanie execute_sql_limited z argumentami:`, args);
+
+      const result = await handleExecuteSQLLimited(databaseClient, args);
+
+      return {
+        content: result.content.map((item) => ({
+          type: item.type as 'text',
+          text: item.text,
+        })),
+      };
+    }
+  );
+
   return server;
 }
 
@@ -100,6 +191,15 @@ async function main(): Promise<void> {
     // Utwórz klienta API
     const apiClient = new ApiClient(config);
     log('info', 'Klient API zainicjalizowany');
+
+    // Utwórz klienta bazy danych
+    const databaseClient = new DatabaseClient(config);
+    if (config.supabaseProjectUrl && config.supabaseBearerToken) {
+      log('info', 'Klient bazy danych zainicjalizowany [Bearer Token - z RLS]');
+      log('info', '✓ Wszystkie zapytania respektują Row Level Security - bezpieczne dla agentów AI');
+    } else {
+      log('warn', 'Klient bazy danych nie został skonfigurowany. Narzędzia database będą niedostępne.');
+    }
 
     // Utwórz Express app
     const app = express();
@@ -151,7 +251,7 @@ async function main(): Promise<void> {
           mcp: '/mcp (GET, POST, DELETE)',
           test: '/test/verify-order',
         },
-        tools: ['verify_order'],
+        tools: ['verify_order', 'get_database_schema', 'execute_sql_limited'],
         activeSessions: transports.size,
       });
     });
@@ -222,7 +322,7 @@ async function main(): Promise<void> {
 
           // Połącz transport z serwerem MCP
           // Przekaż token z Authorization header (jeśli istnieje)
-          const mcpServer = createMcpServer(apiClient, authToken);
+          const mcpServer = createMcpServer(apiClient, databaseClient, authToken);
           await mcpServer.connect(transport);
           await transport.handleRequest(req, res, req.body);
           return;
@@ -341,8 +441,8 @@ async function main(): Promise<void> {
     if (error instanceof Error) {
       console.error(`\nBŁĄD: ${error.message}\n`);
 
-      if (error.message.includes('SUPABASE_URL')) {
-        console.error('Ustaw zmienną środowiskową SUPABASE_URL');
+      if (error.message.includes('SUPABASE_PROJECT_URL')) {
+        console.error('Ustaw zmienną środowiskową SUPABASE_PROJECT_URL');
       } else if (error.message.includes('SUPABASE_BEARER_TOKEN')) {
         console.error('Ustaw zmienną środowiskową SUPABASE_BEARER_TOKEN');
       }
