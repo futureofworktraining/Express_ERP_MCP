@@ -34,8 +34,10 @@ function log(level: string, message: string, ...args: unknown[]): void {
 
 /**
  * Tworzy instancję MCP servera z naszymi narzędziami
+ * @param apiClient - Klient API
+ * @param bearerToken - Token autoryzacyjny (opcjonalny, przekazywany do Supabase)
  */
-function createMcpServer(apiClient: ApiClient): McpServer {
+function createMcpServer(apiClient: ApiClient, bearerToken?: string): McpServer {
   const server = new McpServer(
     {
       name: 'express-erp-mcp',
@@ -66,7 +68,9 @@ function createMcpServer(apiClient: ApiClient): McpServer {
     },
     async (args, _extra) => {
       log('info', `Wywołanie verify_order z argumentami:`, args);
-      const result = await handleVerifyOrder(apiClient, args);
+
+      // Przekaż token do handleVerifyOrder (jeśli został podany podczas tworzenia serwera)
+      const result = await handleVerifyOrder(apiClient, args, bearerToken);
 
       // Konwersja do właściwego typu
       return {
@@ -110,70 +114,15 @@ async function main(): Promise<void> {
       })
     );
 
-    // MCP Authorization Middleware - zgodne z MCP Specification 2025-03-26
-    // https://modelcontextprotocol.io/specification/2025-03-26/basic/authorization
-    const MCP_API_KEY = process.env.MCP_API_KEY;
-    const authMiddleware = (req: express.Request, res: express.Response, next: express.NextFunction) => {
-      // Pomiń autentykację dla publicznych endpoints
-      if (req.path === '/health' || req.path === '/' || req.path === '/test/verify-order') {
-        return next();
+    // Middleware do przechowywania Authorization header w request
+    // Token będzie przekazywany bezpośrednio do Supabase API
+    app.use((req: express.Request, _res: express.Response, next: express.NextFunction) => {
+      // Przechowaj Authorization header w req dla późniejszego użycia
+      if (req.headers['authorization']) {
+        (req as any).authToken = req.headers['authorization'].replace(/^Bearer\s+/i, '');
       }
-
-      if (!MCP_API_KEY) {
-        // Jeśli MCP_API_KEY nie jest ustawiony, pomiń autentykację (development mode)
-        log('info', 'MCP_API_KEY nie ustawiony - autentykacja wyłączona (dev mode)');
-        return next();
-      }
-
-      // Sprawdź Authorization header (zgodnie z MCP spec)
-      // Format: "Authorization: Bearer <token>"
-      const authHeader = req.headers['authorization'];
-
-      if (!authHeader) {
-        log('error', 'Brak Authorization header');
-        return res.status(401).json({
-          jsonrpc: '2.0',
-          error: {
-            code: -32000,
-            message: 'Unauthorized: Authorization header required. Use "Authorization: Bearer <token>"',
-          },
-          id: null,
-        });
-      }
-
-      // Wyciągnij token z Bearer
-      const token = authHeader.replace(/^Bearer\s+/i, '');
-
-      if (!token || token === authHeader) {
-        log('error', 'Nieprawidłowy format Authorization header');
-        return res.status(400).json({
-          jsonrpc: '2.0',
-          error: {
-            code: -32000,
-            message: 'Bad Request: Authorization header must use Bearer scheme',
-          },
-          id: null,
-        });
-      }
-
-      if (token !== MCP_API_KEY) {
-        log('error', 'Nieprawidłowy access token');
-        return res.status(403).json({
-          jsonrpc: '2.0',
-          error: {
-            code: -32000,
-            message: 'Forbidden: Invalid access token',
-          },
-          id: null,
-        });
-      }
-
-      // Token poprawny
-      log('info', 'Autentykacja zakończona sukcesem');
       next();
-    };
-
-    app.use(authMiddleware);
+    });
 
     // Mapa przechowująca transporty per sesja
     const transports: Map<string, StreamableHTTPServerTransport> = new Map();
@@ -249,6 +198,9 @@ async function main(): Promise<void> {
           // Nowa sesja - inicjalizacja
           log('info', 'Inicjalizacja nowej sesji MCP');
 
+          // Wyciągnij token z requesta (jeśli istnieje)
+          const authToken = (req as any).authToken;
+
           // Uwaga: eventStore jest opcjonalny i wymagany tylko dla resumability
           // Na razie pomijamy go dla uproszczenia
           transport = new StreamableHTTPServerTransport({
@@ -269,7 +221,8 @@ async function main(): Promise<void> {
           };
 
           // Połącz transport z serwerem MCP
-          const mcpServer = createMcpServer(apiClient);
+          // Przekaż token z Authorization header (jeśli istnieje)
+          const mcpServer = createMcpServer(apiClient, authToken);
           await mcpServer.connect(transport);
           await transport.handleRequest(req, res, req.body);
           return;

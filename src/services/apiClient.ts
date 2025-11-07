@@ -17,8 +17,13 @@ export class ApiClient {
 
   /**
    * Weryfikuje zamówienie w systemie ERP
+   * @param numerZamowienia - Numer zamówienia do weryfikacji
+   * @param bearerToken - Token autoryzacyjny (opcjonalny, jeśli nie podany używa z config)
    */
-  async verifyOrder(numerZamowienia: string): Promise<OrderVerificationResponse> {
+  async verifyOrder(
+    numerZamowienia: string,
+    bearerToken?: string
+  ): Promise<OrderVerificationResponse> {
     // Walidacja wejścia
     if (!numerZamowienia || numerZamowienia.trim().length === 0) {
       throw new ApiError('Numer zamówienia nie może być pusty', 400);
@@ -32,9 +37,12 @@ export class ApiClient {
       numer_zamowienia: numerZamowienia.trim(),
     };
 
+    // Użyj przekazanego tokena lub domyślnego z config
+    const token = bearerToken || this.config.supabaseBearerToken;
+
     // Wykonaj żądanie z retry logic
     return await this.executeWithRetry(async () => {
-      return await this.makeRequest(requestBody);
+      return await this.makeRequest(requestBody, token);
     });
   }
 
@@ -42,7 +50,8 @@ export class ApiClient {
    * Wykonuje żądanie HTTP do API
    */
   private async makeRequest(
-    body: OrderVerificationRequest
+    body: OrderVerificationRequest,
+    bearerToken: string
   ): Promise<OrderVerificationResponse> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.config.apiTimeout);
@@ -52,7 +61,7 @@ export class ApiClient {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${this.config.supabaseBearerToken}`,
+          Authorization: `Bearer ${bearerToken}`,
         },
         body: JSON.stringify(body),
         signal: controller.signal,

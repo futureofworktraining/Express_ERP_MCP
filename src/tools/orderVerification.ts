@@ -30,10 +30,14 @@ export const verifyOrderTool = {
 
 /**
  * Handler dla narzędzia verify_order
+ * @param apiClient - Klient API
+ * @param args - Argumenty narzędzia
+ * @param bearerToken - Token autoryzacyjny (opcjonalny, przekazywany do Supabase)
  */
 export async function handleVerifyOrder(
   apiClient: ApiClient,
-  args: unknown
+  args: unknown,
+  bearerToken?: string
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
   try {
     // Walidacja argumentów
@@ -47,8 +51,8 @@ export async function handleVerifyOrder(
       throw new Error('Parametr numer_zamowienia musi być ciągiem znaków');
     }
 
-    // Wywołanie API
-    const result = await apiClient.verifyOrder(numer_zamowienia);
+    // Wywołanie API z przekazaniem tokena (jeśli podany)
+    const result = await apiClient.verifyOrder(numer_zamowienia, bearerToken);
 
     // Formatowanie odpowiedzi
     let responseText: string;
