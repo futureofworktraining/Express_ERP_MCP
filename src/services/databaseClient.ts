@@ -72,7 +72,7 @@ export class DatabaseClient {
         FROM information_schema.tables
         WHERE table_schema = '${schema}'
           AND table_type = 'BASE TABLE'
-        ORDER BY table_name;
+        ORDER BY table_name
       `;
 
       const { data: tablesData, error: tablesError } = await this.supabase!.rpc(
@@ -168,7 +168,7 @@ export class DatabaseClient {
       FROM information_schema.columns
       WHERE table_schema = '${schema}'
         AND table_name = '${tableName}'
-      ORDER BY ordinal_position;
+      ORDER BY ordinal_position
     `;
 
     const result = await this.executeRawSQL(query);
@@ -198,7 +198,7 @@ export class DatabaseClient {
         AND ccu.table_schema = tc.table_schema
       WHERE tc.constraint_type = 'FOREIGN KEY'
         AND tc.table_schema = '${schema}'
-        AND tc.table_name = '${tableName}';
+        AND tc.table_name = '${tableName}'
     `;
 
     const result = await this.executeRawSQL(query);
@@ -227,7 +227,7 @@ export class DatabaseClient {
       WHERE t.relkind = 'r'
         AND n.nspname = '${schema}'
         AND t.relname = '${tableName}'
-      ORDER BY i.relname;
+      ORDER BY i.relname
     `;
 
     const result = await this.executeRawSQL(query);
